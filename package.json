@@ -1,6 +1,6 @@
 {
   "name": "datalastic",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Node.js SDK for the Datalastic Maritime API",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
@@ -53,9 +53,16 @@
   "jest": {
     "preset": "ts-jest/presets/default-esm",
     "testEnvironment": "node",
-    "extensionsToTreatAsEsm": [".ts"],
+    "extensionsToTreatAsEsm": [
+      ".ts"
+    ],
     "transform": {
-      "^.+\\.tsx?$": ["ts-jest", { "useESM": true }]
+      "^.+\\.tsx?$": [
+        "ts-jest",
+        {
+          "useESM": true
+        }
+      ]
     },
     "moduleNameMapper": {
       "^(\\.{1,2}/.*)\\.js$": "$1"
