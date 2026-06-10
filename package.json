@@ -1,6 +1,6 @@
 {
   "name": "datalastic",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Node.js SDK for the Datalastic Maritime API",
   "main": "./dist/cjs/index.js",
   "module": "./dist/esm/index.js",
