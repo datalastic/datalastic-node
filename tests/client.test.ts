@@ -254,18 +254,27 @@ describe('vessels.find()', () => {
   test('maps vesselType to type query param', async () => {
     fetchSpy.mockResolvedValue(jsonResponse({ data: [], meta: {} }));
     const client = new Client(API_KEY);
-    await client.vessels.find({ vesselType: 'Cargo' });
+    const result = await client.vessels.find({ vesselType: 'Cargo' });
     const url = lastUrl();
     expect(url).toContain('type=Cargo');
     expect(url).not.toContain('vesselType');
+    expect(result.vessels).toEqual([]);
   });
 
-  test('happy path with name', async () => {
-    const data = [{ uuid: 'v1', name: 'Maersk' }];
-    fetchSpy.mockResolvedValue(jsonResponse({ data, meta: {} }));
+  test('happy path with name returns VesselFindResult', async () => {
+    const vessels = [{ uuid: 'v1', name: 'Maersk' }];
+    fetchSpy.mockResolvedValue(jsonResponse({ data: vessels, meta: { next: 'tok123' } }));
     const client = new Client(API_KEY);
     const result = await client.vessels.find({ name: 'Maersk' });
-    expect(result).toEqual(data);
+    expect(result).toEqual({ vessels, next: 'tok123' });
+  });
+
+  test('next is undefined when not in meta', async () => {
+    const vessels = [{ uuid: 'v1', name: 'Maersk' }];
+    fetchSpy.mockResolvedValue(jsonResponse({ data: vessels, meta: {} }));
+    const client = new Client(API_KEY);
+    const result = await client.vessels.find({ name: 'Maersk' });
+    expect(result).toEqual({ vessels, next: undefined });
   });
 
   test('throws when no search param', async () => {

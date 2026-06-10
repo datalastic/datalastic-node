@@ -52,6 +52,11 @@ export interface VesselInRadiusResult {
   vessels: Array<Vessel & { distance: number }>;
 }
 
+export interface VesselFindResult {
+  vessels: VesselInfo[];
+  next?: string;
+}
+
 export interface VesselHistory {
   uuid: string;
   name: string;

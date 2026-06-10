@@ -32,7 +32,7 @@ const DEFAULT_TIMEOUT_MS = 30_000;
 /** Values accepted for query parameters. Arrays are emitted as repeated keys. */
 export type QueryParams = Record<
   string,
-  string | number | string[] | undefined
+  string | number | boolean | string[] | undefined
 >;
 
 export interface ClientOptions {
@@ -70,6 +70,41 @@ export class Client {
   }
 
   /**
+   * Perform a GET request and return `{ data, meta }` from the response envelope.
+   * @internal
+   */
+  async _getFull<T>(
+    path: string,
+    base: string = BASE_V0,
+    params: QueryParams = {},
+  ): Promise<{ data: T; meta: Record<string, unknown> }> {
+    const search = new URLSearchParams();
+    search.append('api-key', this.apiKey);
+    for (const [key, value] of Object.entries(params)) {
+      if (value === undefined) continue;
+      if (Array.isArray(value)) {
+        for (const item of value) search.append(key, String(item));
+      } else {
+        search.append(key, String(value));
+      }
+    }
+    const url = `${base}${path}?${search.toString()}`;
+    const response = await this.fetchWithTimeout(url);
+    if (!response.ok) throw await mapErrorResponse(response);
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      throw new APIError('Response body was not valid JSON.', response.status);
+    }
+    if (typeof body !== 'object' || body === null || !('data' in body)) {
+      throw new APIError('Malformed API response: missing "data" key.', response.status);
+    }
+    const b = body as { data: T; meta: Record<string, unknown> };
+    return { data: b.data, meta: b.meta ?? {} };
+  }
+
+  /**
    * Perform a GET request, unwrap the `{ data, meta }` envelope and return
    * `data`. Throws a typed {@link DatalasticError} subclass on failure.
    * @internal
@@ -79,25 +114,7 @@ export class Client {
     base: string = BASE_V0,
     params: QueryParams = {},
   ): Promise<T> {
-    const search = new URLSearchParams();
-    // api-key is always a query parameter.
-    search.append('api-key', this.apiKey);
-
-    for (const [key, value] of Object.entries(params)) {
-      if (value === undefined) continue;
-      if (Array.isArray(value)) {
-        // Repeated params: mmsi=a&mmsi=b ...
-        for (const item of value) {
-          search.append(key, String(item));
-        }
-      } else {
-        search.append(key, String(value));
-      }
-    }
-
-    const url = `${base}${path}?${search.toString()}`;
-    const response = await this.fetchWithTimeout(url);
-    return this.handleResponse<T>(response);
+    return (await this._getFull<T>(path, base, params)).data;
   }
 
   /**

@@ -6,6 +6,7 @@ import type {
   Vessel,
   VesselBulkResult,
   VesselEstimated,
+  VesselFindResult,
   VesselHistory,
   VesselInfo,
   VesselInRadiusResult,
@@ -37,6 +38,7 @@ export interface VesselInRadiusParams {
   type?: string;
   type_specific?: string;
   exclude?: string;
+  _empty_?: boolean;
   nav_status?: number;
   next?: string;
 }
@@ -52,6 +54,7 @@ export interface VesselFindParams {
   fuzzy?: number;
   vesselType?: string;
   type_specific?: string;
+  _empty_?: boolean;
   country_iso?: string;
   gross_tonnage_min?: number;
   gross_tonnage_max?: number;
@@ -168,7 +171,7 @@ export class VesselsResource {
   }
 
   /** Search the vessel database by particulars. */
-  async find(params: VesselFindParams): Promise<VesselInfo[]> {
+  async find(params: VesselFindParams): Promise<VesselFindResult> {
     const { vesselType, fuzzy, next, ...searchable } = params;
     const hasSearch =
       vesselType !== undefined ||
@@ -184,7 +187,11 @@ export class VesselsResource {
     // vesselType maps to the `type` query parameter.
     if (vesselType !== undefined) query.type = vesselType;
 
-    return this.client._get<VesselInfo[]>('/vessel_find', undefined, query);
+    const { data, meta } = await this.client._getFull<VesselInfo[]>('/vessel_find', undefined, query);
+    return {
+      vessels: data,
+      next: typeof meta.next === 'string' ? meta.next : undefined,
+    };
   }
 
   /** Pro position with an estimated dead-reckoned position (extended API). */
