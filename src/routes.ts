@@ -1,6 +1,6 @@
 /** Sea route calculation (extended API). */
 
-import { BASE_EXT, type Client, type QueryParams } from './client.js';
+import { BASE_EXT, type Datalastic, type QueryParams } from './client.js';
 import { DatalasticError } from './errors.js';
 import type { SeaRoute } from './models.js';
 
@@ -16,7 +16,7 @@ export interface RouteCalculateParams {
 }
 
 export class RoutesResource {
-  constructor(private readonly client: Client) {}
+  constructor(private readonly client: Datalastic) {}
 
   /** Compute a sea route between two points or ports. */
   async calculate(params: RouteCalculateParams): Promise<SeaRoute> {

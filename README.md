@@ -37,16 +37,16 @@ Node.js 18 or later is required.
 Pass your API key to the constructor. The Datalastic Node.js SDK attaches it as a query parameter on every request automatically.
 
 ```ts
-import { Client } from 'datalastic';
+import { Datalastic } from 'datalastic';
 
-const client = new Client(process.env.DATALASTIC_API_KEY!);
+const client = new Datalastic(process.env.DATALASTIC_API_KEY!);
 ```
 
 CommonJS:
 
 ```js
-const { Client } = require('datalastic');
-const client = new Client(process.env.DATALASTIC_API_KEY);
+const { Datalastic } = require('datalastic');
+const client = new Datalastic(process.env.DATALASTIC_API_KEY);
 ```
 
 **Security:** The API key travels in the URL query string on every GET request. That means it shows up in server access logs and proxy logs. Keep it in an environment variable, do not commit it to version control, and avoid logging request URLs in production.
@@ -67,7 +67,7 @@ console.log(`Requests remaining: ${stat.requests_remaining}`);
 You can raise the default 30-second timeout if your environment needs more headroom:
 
 ```ts
-const client = new Client(process.env.DATALASTIC_API_KEY!, { timeout: 60_000 });
+const client = new Datalastic(process.env.DATALASTIC_API_KEY!, { timeout: 60_000 });
 ```
 
 ---
@@ -339,7 +339,7 @@ Every error thrown by the Datalastic Node.js SDK extends `DatalasticError`. You 
 
 ```ts
 import {
-  Client,
+  Datalastic,
   DatalasticError,
   AuthenticationError,
   InsufficientCreditsError,
@@ -348,7 +348,7 @@ import {
   APIError,
 } from 'datalastic';
 
-const client = new Client(process.env.DATALASTIC_API_KEY!);
+const client = new Datalastic(process.env.DATALASTIC_API_KEY!);
 
 try {
   const vessel = await client.vessels.get({ mmsi: '477882000' });

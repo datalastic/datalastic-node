@@ -1,11 +1,11 @@
 /** Asynchronous maritime report submission and retrieval. */
 
-import { BASE_MR, type Client } from './client.js';
+import { BASE_MR, type Datalastic } from './client.js';
 import { DatalasticError } from './errors.js';
 import type { Report } from './models.js';
 
 export class ReportsResource {
-  constructor(private readonly client: Client) {}
+  constructor(private readonly client: Datalastic) {}
 
   /** Submit a new report job. The api-key is injected into the POST body. */
   async submit(

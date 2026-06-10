@@ -3,20 +3,20 @@
  *
  * @example
  * ```ts
- * import { Client } from 'datalastic';
+ * import { Datalastic } from 'datalastic';
  *
- * const client = new Client(process.env.DATALASTIC_API_KEY!);
+ * const client = new Datalastic(process.env.DATALASTIC_API_KEY!);
  * const vessel = await client.vessels.get({ mmsi: '477882000' });
  * console.log(vessel.lat, vessel.lon);
  * ```
  */
 
 export {
-  Client,
+  Datalastic,
   BASE_V0,
   BASE_EXT,
   BASE_MR,
-  type ClientOptions,
+  type DatalasticOptions,
   type QueryParams,
 } from './client.js';
 

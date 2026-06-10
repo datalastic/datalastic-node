@@ -1,6 +1,6 @@
 /** Vessel tracking and lookup endpoints. */
 
-import { BASE_EXT, type Client, type QueryParams } from './client.js';
+import { BASE_EXT, type Datalastic, type QueryParams } from './client.js';
 import { DatalasticError } from './errors.js';
 import type {
   Vessel,
@@ -84,7 +84,7 @@ function toArray(value: string | string[] | undefined): string[] | undefined {
 }
 
 export class VesselsResource {
-  constructor(private readonly client: Client) {}
+  constructor(private readonly client: Datalastic) {}
 
   /** Real-time position for a single vessel. */
   async get(params: VesselIdentifier): Promise<Vessel> {

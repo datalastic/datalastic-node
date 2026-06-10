@@ -1,6 +1,6 @@
 /** Port lookup endpoints. */
 
-import type { Client, QueryParams } from './client.js';
+import type { Datalastic, QueryParams } from './client.js';
 import { DatalasticError } from './errors.js';
 import type { Port, PortDetail } from './models.js';
 
@@ -26,7 +26,7 @@ export interface PortGetParams {
 }
 
 export class PortsResource {
-  constructor(private readonly client: Client) {}
+  constructor(private readonly client: Datalastic) {}
 
   /** Search ports by name, location, or attributes. */
   async find(params: PortFindParams): Promise<Port[]> {

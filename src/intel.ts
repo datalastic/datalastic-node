@@ -1,6 +1,6 @@
 /** Maritime intelligence endpoints (maritime_reports base). */
 
-import { BASE_MR, type Client, type QueryParams } from './client.js';
+import { BASE_MR, type Datalastic, type QueryParams } from './client.js';
 import { DatalasticError } from './errors.js';
 import type {
   CasualtyRecord,
@@ -84,7 +84,7 @@ function requireAtLeastOne(params: object, method: string): void {
 }
 
 export class IntelResource {
-  constructor(private readonly client: Client) {}
+  constructor(private readonly client: Datalastic) {}
 
   /** Dry dock and special survey schedule records. */
   async dryDock(params: DryDockParams): Promise<DryDockRecord[]> {

@@ -35,12 +35,12 @@ export type QueryParams = Record<
   string | number | boolean | string[] | undefined
 >;
 
-export interface ClientOptions {
+export interface DatalasticOptions {
   /** Request timeout in milliseconds. Defaults to 30000. */
   timeout?: number;
 }
 
-export class Client {
+export class Datalastic {
   private readonly apiKey: string;
   private readonly timeout: number;
 
@@ -50,9 +50,9 @@ export class Client {
   readonly intel: IntelResource;
   readonly reports: ReportsResource;
 
-  constructor(apiKey: string, options: ClientOptions = {}) {
+  constructor(apiKey: string, options: DatalasticOptions = {}) {
     if (!apiKey || apiKey.trim() === '') {
-      throw new DatalasticError('An API key is required to create a Client.');
+      throw new DatalasticError('An API key is required to create a Datalastic client.');
     }
     this.apiKey = apiKey;
     this.timeout = options.timeout ?? DEFAULT_TIMEOUT_MS;
