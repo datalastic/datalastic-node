@@ -76,6 +76,8 @@ const client = new Client(process.env.DATALASTIC_API_KEY!, { timeout: 60_000 });
 
 ### Real-time position
 
+Returns a single `Vessel` with the latest AIS position: identity (`uuid`, `name`, `mmsi`, `imo`, `eni`, `country_iso`, `type`, `type_specific`), position (`lat`, `lon`), movement (`speed` in knots, `course`, `heading`, `navigation_status`), the reported `destination`, and the timestamp of the fix (`last_position_epoch`, `last_position_UTC`).
+
 ```ts
 const vessel = await client.vessels.get({ mmsi: '477882000' });
 console.log(`${vessel.name} is at ${vessel.lat}, ${vessel.lon}`);
@@ -85,6 +87,14 @@ One of `uuid`, `mmsi`, or `imo` is required.
 
 ### Extended position with voyage details
 
+Returns a `VesselPro`, which includes **everything `vessels.get` returns** (identity, position, movement, destination, timestamps) **plus** a voyage layer:
+
+- `current_draught` — reported draught in meters
+- `dest_port` / `dest_port_unlocode` — declared destination port name and UN/LOCODE
+- `dep_port` / `dep_port_unlocode` — departure port name and UN/LOCODE
+- `atd_UTC` / `atd_epoch` — actual time of departure
+- `eta_UTC` / `eta_epoch` — estimated time of arrival
+
 ```ts
 const pro = await client.vessels.pro({ imo: '9525338' });
 console.log(pro.destination, pro.eta_UTC);
@@ -92,7 +102,7 @@ console.log(pro.destination, pro.eta_UTC);
 
 ### Dead-reckoned estimated position
 
-When a vessel goes dark, the estimated endpoint projects its last known position forward using course and speed:
+Returns a `VesselEstimated`: all fields from `vessels.pro` **plus** `estimated_position: { lat, lon }`. When a vessel goes dark, this is the position dead-reckoned forward from its last known course and speed:
 
 ```ts
 const est = await client.vessels.estimated({ uuid: 'e7a3c1f2-...' });
@@ -100,6 +110,8 @@ console.log(est.estimated_position.lat, est.estimated_position.lon);
 ```
 
 ### Multiple vessels in one call
+
+Returns `{ total, vessels }`, where `vessels` is an array of `Vessel` records (same fields as `vessels.get`) and `total` is the count matched:
 
 ```ts
 const bulk = await client.vessels.bulk({
@@ -112,7 +124,7 @@ console.log(bulk.total, bulk.vessels);
 
 ### Vessels within a radius
 
-Pass a center point, a radius in nautical miles, and an optional vessel type:
+Returns `{ point: { lat, lon, radius }, total, vessels }`. Each entry in `vessels` is a standard `Vessel` with a `distance` field (nautical miles from center). Pass a center point, a radius in nautical miles, and an optional vessel type:
 
 ```ts
 const nearby = await client.vessels.inRadius({
@@ -128,13 +140,15 @@ console.log(nearby.total, nearby.vessels);
 
 ### Historical track
 
+Returns a `VesselHistory`: the vessel's identity fields (`uuid`, `name`, `mmsi`, `imo`, `eni`, `country_iso`, `type`, `type_specific`) plus a `positions` array. Each position holds `lat`, `lon`, `speed`, `course`, `heading`, `destination`, and the timestamp (`last_position_epoch`, `last_position_UTC`):
+
 ```ts
 const history = await client.vessels.history({ mmsi: '477882000', days: 7 });
 ```
 
 ### Static particulars
 
-Tonnage, dimensions, year built, flag, and call sign:
+Returns a `VesselInfo` with the vessel's static record: identity and flag (`uuid`, `name`, `name_ais`, `mmsi`, `imo`, `eni`, `country_iso`, `country_name`, `callsign`, `type`, `type_specific`), capacity (`gross_tonnage`, `deadweight`, `teu`, `liquid_gas`), dimensions (`length`, `breadth`, `draught_avg`, `draught_max`), performance (`speed_avg`, `speed_max`), and registration (`year_built`, `is_navaid`, `home_port`). Capacity, draught, and speed averages may be `null` when unknown.
 
 ```ts
 const info = await client.vessels.info({ imo: '9525338' });
@@ -142,6 +156,8 @@ console.log(info.gross_tonnage, info.length, info.year_built);
 ```
 
 ### Search the vessel database
+
+Returns an array of `VesselInfo` records — the same static particulars as `vessels.info` (tonnage, deadweight, dimensions, year built, home port, call sign, etc.), one per matching vessel:
 
 ```ts
 const results = await client.vessels.find({
@@ -159,13 +175,15 @@ const results = await client.vessels.find({
 
 ### Search ports
 
+Returns an array of `Port` records. Each has `uuid`, `port_name`, `country_iso`, `country_name`, `unlocode`, `port_type`, coordinates (`lat`, `lon`), and regional grouping (`area_lvl1`, `area_lvl2`):
+
 ```ts
 const ports = await client.ports.find({ name: 'Rotterdam' });
 ```
 
 ### Detailed port record
 
-Returns terminals, coordinates, and area data:
+Returns a `PortDetail`: all `Port` fields plus a `terminals` array. Each terminal carries `terminal_code`, `terminal_name`, `company_name`, coordinates (`lat`, `lon`), `url`, and `address`:
 
 ```ts
 const port = await client.ports.get({ unlocode: 'NLRTM' });
@@ -176,7 +194,7 @@ console.log(port.terminals);
 
 ## Sea Routes
 
-Calculate a navigable sea route between two points. This AIS data API Node.js client also accepts port UUIDs or UN/LOCODEs as origin and destination:
+Calculate a navigable sea route between two points. Returns a `SeaRoute` of `{ from, route, to }`, where `from` and `to` are GeoJSON point features and `route` is the GeoJSON line of the path. The total distance in nautical miles is at `route.properties.total_dist`. Port UUIDs and UN/LOCODEs are also accepted as origin and destination:
 
 ```ts
 // By coordinates
@@ -211,11 +229,15 @@ All intel methods return typed arrays of records. At least one parameter is requ
 
 ### Dry dock and survey schedule
 
+Returns `DryDockRecord[]`. Each record has an `id` and covers survey and docking dates (`special_survey_date`, `dry_dock_date`), the IOPP certificate window (`iopp_issue_date`, `iopp_exp_date`), the responsible `technical_manager`, and top-level contact fields (`country_code`, `website`, `email`, `phone`, `address`, `linkedin`), keyed by `imo` and `vessel_name` with `modified_at`:
+
 ```ts
 const schedule = await client.intel.dryDock({ imo: '9525338' });
 ```
 
 ### Casualty records
+
+Returns `CasualtyRecord[]`. Each record covers a single incident: `casualty_date`, `casualty_type`, and free-text `casualty_details`, tied to `imo` and `vessel_name` with `modified_at`:
 
 ```ts
 const casualties = await client.intel.casualties({ imo: '9525338', from: '2020-01-01' });
@@ -223,11 +245,15 @@ const casualties = await client.intel.casualties({ imo: '9525338', from: '2020-0
 
 ### Port state control inspections
 
+Returns `InspectionRecord[]`. Each record covers one PSC inspection: `inspection_date`, `inspection_authority`, `inspection_port`, `inspection_type`, the `detention` value (a string code), deficiency counts and text (`ship_deficiencies`, `deficiency_description`), vessel classification (`vessel_type_code`, `flag_code`), the responsible `technical_ism_manager`, and top-level contact fields (`country_code`, `website`, `email`, `phone`, `address`, `company_imo`):
+
 ```ts
 const inspections = await client.intel.inspections({ imo: '9525338' });
 ```
 
 ### Sale and purchase deals
+
+Returns `SPDRecord[]`. Each record is a sale-and-purchase transaction: `seller`, `buyer`, price (`sales_price_usd_mio` (nullable), `sales_price_usd/ldt`), `sales_report_date`, `sales_type`, `destination`, vessel particulars (`flag_name`, `vessel_type_code`, `built_year`, `dwt_design`, `gt`, `ldt`), survey dates (`dry_dock_date`, `special_survey_date`), and a `sales_note`:
 
 ```ts
 const deals = await client.intel.spd({ name: 'EVER ACE' });
@@ -235,11 +261,15 @@ const deals = await client.intel.spd({ name: 'EVER ACE' });
 
 ### Ownership and management
 
+Returns `OwnershipRecord[]`. Each record maps the management chain: `beneficial_owner` (+ `beneficial_owner_country`), `operator` (+ `operator_country`), `technical_manager` (+ `technical_manager_country`, both `string | null`), `commercial_manager` (+ `commercial_manager_country`), plus `flag_name`, `vessel_type_code`, `built_year`, `dwt_design`, the nullable `buyer`, and `class1_code`:
+
 ```ts
 const ownership = await client.intel.ownership({ beneficial_owner: 'Evergreen Marine' });
 ```
 
 ### Classification society records
+
+Returns `ClassSocietyRecord[]`. Each record holds the class assignment (`class1_code`) alongside vessel classification (`vessel_type_code`, `flag_name`, `built_year`), survey dates (`special_survey_date`, `dry_dock_date`, both `string | null`), hull dimensions (`loa`, `lbp`, `depth`, `beam_moduled`, `draft_design`), tonnages (`gt`, `nt`, `dwt_design`), propulsion (`engine_builder`, `engine_designer`, `propulsion_type_code`), and ownership links (`beneficial_owner` / `beneficial_owner_imo`, `technical_manager` / `technical_manager_imo`):
 
 ```ts
 const classSociety = await client.intel.classSociety({ imo: '9525338' });
@@ -247,12 +277,16 @@ const classSociety = await client.intel.classSociety({ imo: '9525338' });
 
 ### Engine and propulsion
 
+Returns `EngineRecord[]`. Each record describes the main engine: `engine_designation`, `engine_builder`, `engine_designer`, `propulsion_type_code`, and maximum continuous output (`mco` with `mco_unit` and `mco_rpm`), plus `vessel_type_code`, `trading_category_code`, `built_year`, and `gt`:
+
 ```ts
 const engines = await client.intel.engine({ imo: '9525338' });
 console.log(engines[0].engine_designation, engines[0].mco, engines[0].mco_unit);
 ```
 
 ### Company registry
+
+Returns `CompanyRecord[]`. Each record is a maritime company: `short_name`, `long_name`, `company_type`, `company_imo`, `company_status`, `country_code`, contact details (`website`, `email`, `phone`, `address`, `linkedin`), parent linkage (`parent_company_imo`, `parent_company_name`), and `modified_at`:
 
 ```ts
 const companies = await client.intel.companies({ company_imo: '1234567' });
@@ -266,12 +300,16 @@ Report jobs run asynchronously. Submit a job, then poll until `status` is `'comp
 
 ### Submit a job
 
+Returns a `Report`: `report_id`, `report_type`, `status`, `created_at`, optional `updated_at` and `params`, and a `result_url` that is populated once the job finishes. Use `report_id` to poll:
+
 ```ts
 const job = await client.reports.submit('port_calls', { imo: '9525338' });
 console.log(job.report_id);
 ```
 
 ### Poll for completion
+
+Returns the same `Report` shape, refreshed. Poll until `status === 'complete'`, at which point `result_url` points to the generated output:
 
 ```ts
 let report;
@@ -286,6 +324,8 @@ console.log(report.result_url);
 ```
 
 ### List all reports
+
+Returns an array of every `Report` on the account, each with the same shape (`report_id`, `report_type`, `status`, `result_url?`, `created_at`, ...):
 
 ```ts
 const all = await client.reports.listAll();
@@ -345,7 +385,7 @@ Validation errors (missing required fields) throw `DatalasticError` before any n
 
 ## TypeScript
 
-The package exports typed interfaces for every resource. This is a TypeScript maritime API client — import the types alongside the client:
+The package exports typed interfaces for every resource. Import them alongside the client:
 
 ```ts
 import type {
