@@ -7,7 +7,7 @@ import type { Report } from './models.js';
 export class ReportsResource {
   constructor(private readonly client: Datalastic) {}
 
-  /** Submit a new report job. The api-key is injected into the POST body. */
+  /** Submit a new report job. The api-key is sent as the `x-api-key` header. */
   async submit(
     reportType: string,
     params: Record<string, unknown> = {},

@@ -40,7 +40,7 @@ tests/
 
 ## Key conventions
 
-- **Auth is a query parameter, not a header.** `_get` appends `api-key=` to the URL. `_post` injects `"api-key"` into the JSON body. Both methods are marked `@internal` and are excluded from published `.d.ts` declarations — they are used only by resource classes inside this package.
+- **Auth is the `x-api-key` HTTP header.** Both `_get` and `_post` send the key as the `x-api-key` header — never in the query string or POST body. Both methods are marked `@internal` and are excluded from published `.d.ts` declarations — they are used only by resource classes inside this package.
 - **Three base URLs.** `BASE_V0` (core), `BASE_EXT` (estimated position, sea routes), `BASE_MR` (intel + reports). `_get(path, base, params)` defaults to `BASE_V0`; pass the base explicitly for the others.
 - **Repeated params for bulk.** Array values become repeated query keys (`mmsi=a&mmsi=b`). `vessels.bulk` normalizes `string | string[]` to arrays.
 - **`vesselType` maps to `type`.** `vessels.find({ vesselType })` is emitted as `type=` in the query string to avoid clashing with the JS `type` keyword.

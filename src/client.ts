@@ -1,8 +1,8 @@
 /**
  * HTTP client and entry point for the Datalastic SDK.
  *
- * Authentication note: the API key is supplied as a `api-key` *query parameter*
- * (or, for POST endpoints, a JSON body field) — never as an HTTP header.
+ * Authentication note: the API key is supplied as an `x-api-key` HTTP header
+ * for both GET and POST requests.
  */
 
 import {
@@ -79,7 +79,6 @@ export class Datalastic {
     params: QueryParams = {},
   ): Promise<{ data: T; meta: Record<string, unknown> }> {
     const search = new URLSearchParams();
-    search.append('api-key', this.apiKey);
     for (const [key, value] of Object.entries(params)) {
       if (value === undefined) continue;
       if (Array.isArray(value)) {
@@ -88,8 +87,11 @@ export class Datalastic {
         search.append(key, String(value));
       }
     }
-    const url = `${base}${path}?${search.toString()}`;
-    const response = await this.fetchWithTimeout(url);
+    const query = search.toString();
+    const url = query ? `${base}${path}?${query}` : `${base}${path}`;
+    const response = await this.fetchWithTimeout(url, {
+      headers: { 'x-api-key': this.apiKey },
+    });
     if (!response.ok) throw await mapErrorResponse(response);
     let body: unknown;
     try {
@@ -118,8 +120,8 @@ export class Datalastic {
   }
 
   /**
-   * Perform a POST request with a JSON body. The api-key is injected into the
-   * body rather than the query string.
+   * Perform a POST request with a JSON body. The api-key is sent as the
+   * `x-api-key` header rather than in the body.
    * @internal
    */
   async _post<T>(
@@ -127,13 +129,15 @@ export class Datalastic {
     body: Record<string, unknown>,
     base: string = BASE_V0,
   ): Promise<T> {
-    const payload = { 'api-key': this.apiKey, ...body };
     const url = `${base}${path}`;
 
     const response = await this.fetchWithTimeout(url, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.apiKey,
+      },
+      body: JSON.stringify(body),
     });
     return this.handleResponse<T>(response);
   }

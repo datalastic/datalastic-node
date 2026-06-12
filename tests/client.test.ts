@@ -68,6 +68,10 @@ function lastInit(): RequestInit | undefined {
   return call[1] as RequestInit | undefined;
 }
 
+function lastHeaders(): Record<string, string> {
+  return (lastInit()?.headers ?? {}) as Record<string, string>;
+}
+
 describe('Datalastic creation', () => {
   test('accepts a valid key', () => {
     expect(() => new Datalastic(API_KEY)).not.toThrow();
@@ -80,7 +84,7 @@ describe('Datalastic creation', () => {
 });
 
 describe('stat()', () => {
-  test('maps happy path to ApiStat and sends api-key as query param', async () => {
+  test('maps happy path to ApiStat and sends api-key as x-api-key header', async () => {
     const stat = {
       user_id: 'u1',
       key_status: 'active',
@@ -95,7 +99,9 @@ describe('stat()', () => {
     expect(result).toEqual(stat);
     const url = lastUrl();
     expect(url).toContain('/api/v0/stat');
-    expect(url).toContain('api-key=test-key');
+    expect(url).not.toContain('api-key=');
+    expect(url.endsWith('?')).toBe(false);
+    expect(lastHeaders()['x-api-key']).toBe(API_KEY);
   });
 
   test.each([
@@ -495,7 +501,7 @@ describe('intel', () => {
 });
 
 describe('reports', () => {
-  test('submit() POSTs with api-key in body and uses maritime_reports base', async () => {
+  test('submit() POSTs with api-key as x-api-key header and uses maritime_reports base', async () => {
     const data = {
       report_id: 'r1',
       report_type: 'inradius_history',
@@ -509,8 +515,9 @@ describe('reports', () => {
 
     const init = lastInit();
     expect(init?.method).toBe('POST');
+    expect(lastHeaders()['x-api-key']).toBe(API_KEY);
     const body = JSON.parse(String(init?.body));
-    expect(body['api-key']).toBe(API_KEY);
+    expect(body['api-key']).toBeUndefined();
     expect(body.report_type).toBe('inradius_history');
     expect(body.imo).toBe('9999999');
     // api-key must NOT be in the URL for POST.
@@ -551,6 +558,33 @@ describe('reports', () => {
     await client.reports.listAll();
     expect(lastUrl()).toContain('report_id=_all');
     expect(lastUrl()).toContain('/api/maritime_reports/report');
+  });
+});
+
+describe('auth header across all base URLs', () => {
+  test('GET to BASE_V0 with query params sends x-api-key header and omits api-key from URL', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse({ data: { uuid: 'v1', name: 'Ship' }, meta: {} }));
+    const client = new Datalastic(API_KEY);
+    await client.vessels.get({ mmsi: '123456789' });
+    expect(lastHeaders()['x-api-key']).toBe(API_KEY);
+    expect(lastUrl()).not.toContain('api-key');
+  });
+
+  test('GET to BASE_EXT sends x-api-key header and omits api-key from URL', async () => {
+    const data = { from: {}, route: { properties: { total_dist: 100 } }, to: {} };
+    fetchSpy.mockResolvedValue(jsonResponse({ data, meta: {} }));
+    const client = new Datalastic(API_KEY);
+    await client.routes.calculate({ port_unlocode_from: 'NLRTM', port_unlocode_to: 'SGSIN' });
+    expect(lastHeaders()['x-api-key']).toBe(API_KEY);
+    expect(lastUrl()).not.toContain('api-key');
+  });
+
+  test('GET to BASE_MR sends x-api-key header and omits api-key from URL', async () => {
+    fetchSpy.mockResolvedValue(jsonResponse({ data: [], meta: {} }));
+    const client = new Datalastic(API_KEY);
+    await client.intel.dryDock({ imo: '9525338' });
+    expect(lastHeaders()['x-api-key']).toBe(API_KEY);
+    expect(lastUrl()).not.toContain('api-key');
   });
 });
 

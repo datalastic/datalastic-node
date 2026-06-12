@@ -34,7 +34,7 @@ Node.js 18 or later is required.
 
 ## Authentication
 
-Pass your API key to the constructor. The Datalastic Node.js SDK attaches it as a query parameter on every request automatically.
+Pass your API key to the constructor. The Datalastic Node.js SDK sends it as an `x-api-key` HTTP header on every request automatically.
 
 ```ts
 import { Datalastic } from 'datalastic';
@@ -49,7 +49,7 @@ const { Datalastic } = require('datalastic');
 const client = new Datalastic(process.env.DATALASTIC_API_KEY);
 ```
 
-**Security:** The API key travels in the URL query string on every GET request. That means it shows up in server access logs and proxy logs. Keep it in an environment variable, do not commit it to version control, and avoid logging request URLs in production.
+**Security:** The API key is sent in the `x-api-key` HTTP header, not the URL, so it does not appear in request paths or server access logs. Keep it in an environment variable, do not commit it to version control, and avoid logging request headers in production.
 
 ---
 
