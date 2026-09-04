@@ -1,6 +1,11 @@
 /** Vessel tracking and lookup endpoints. */
 
-import { BASE_EXT, type Datalastic, type QueryParams } from './client.js';
+import {
+  attachMeta,
+  BASE_EXT,
+  type Datalastic,
+  type QueryParams,
+} from './client.js';
 import { DatalasticError } from './errors.js';
 import type {
   Vessel,
@@ -11,6 +16,7 @@ import type {
   VesselInfo,
   VesselInRadiusResult,
   VesselPro,
+  WithMeta,
 } from './models.js';
 
 /** Identify a single vessel by one of its identifiers. */
@@ -87,19 +93,19 @@ export class VesselsResource {
   constructor(private readonly client: Datalastic) {}
 
   /** Real-time position for a single vessel. */
-  async get(params: VesselIdentifier): Promise<Vessel> {
+  async get(params: VesselIdentifier): Promise<WithMeta<Vessel>> {
     requireIdentifier(params);
     return this.client._get<Vessel>('/vessel', undefined, { ...params });
   }
 
   /** Extended real-time position including voyage details. */
-  async pro(params: VesselIdentifier): Promise<VesselPro> {
+  async pro(params: VesselIdentifier): Promise<WithMeta<VesselPro>> {
     requireIdentifier(params);
     return this.client._get<VesselPro>('/vessel_pro', undefined, { ...params });
   }
 
   /** Positions for multiple vessels in a single call. */
-  async bulk(params: VesselBulkParams): Promise<VesselBulkResult> {
+  async bulk(params: VesselBulkParams): Promise<WithMeta<VesselBulkResult>> {
     const mmsi = toArray(params.mmsi);
     const imo = toArray(params.imo);
     const uuid = toArray(params.uuid);
@@ -125,7 +131,7 @@ export class VesselsResource {
   /** Vessels within a radius of a point, port, or vessel. */
   async inRadius(
     params: VesselInRadiusParams,
-  ): Promise<VesselInRadiusResult> {
+  ): Promise<WithMeta<VesselInRadiusResult>> {
     if (params.radius === undefined || params.radius === null) {
       throw new DatalasticError('radius is required.');
     }
@@ -147,15 +153,31 @@ export class VesselsResource {
         'A center point is required: provide lat/lon, a port, or a vessel identifier.',
       );
     }
-    return this.client._get<VesselInRadiusResult>(
-      '/vessel_inradius',
-      undefined,
-      { ...params },
-    );
+    const { data: result, meta } =
+      await this.client._getWithMeta<VesselInRadiusResult>(
+        '/vessel_inradius',
+        undefined,
+        { ...params },
+      );
+    // Surface the envelope's pagination cursor on the payload so callers can
+    // feed it straight back in as `next`. The cursor comes from the envelope
+    // returned by the request, not from the attached property, so it is right
+    // even when the payload could not carry `meta`. A frozen or sealed
+    // payload is left untouched rather than throwing, matching attachMeta.
+    const cursor = meta.next;
+    if (
+      typeof cursor === 'string' &&
+      result !== null &&
+      typeof result === 'object' &&
+      Object.isExtensible(result)
+    ) {
+      result.next = cursor;
+    }
+    return result;
   }
 
   /** Historical track for a single vessel. */
-  async history(params: VesselHistoryParams): Promise<VesselHistory> {
+  async history(params: VesselHistoryParams): Promise<WithMeta<VesselHistory>> {
     requireIdentifier(params);
     return this.client._get<VesselHistory>('/vessel_history', undefined, {
       ...params,
@@ -163,7 +185,7 @@ export class VesselsResource {
   }
 
   /** Static particulars for a single vessel. */
-  async info(params: VesselIdentifier): Promise<VesselInfo> {
+  async info(params: VesselIdentifier): Promise<WithMeta<VesselInfo>> {
     requireIdentifier(params);
     return this.client._get<VesselInfo>('/vessel_info', undefined, {
       ...params,
@@ -171,7 +193,7 @@ export class VesselsResource {
   }
 
   /** Search the vessel database by particulars. */
-  async find(params: VesselFindParams): Promise<VesselFindResult> {
+  async find(params: VesselFindParams): Promise<WithMeta<VesselFindResult>> {
     const { vesselType, fuzzy, next, ...searchable } = params;
     const hasSearch =
       vesselType !== undefined ||
@@ -187,15 +209,22 @@ export class VesselsResource {
     // vesselType maps to the `type` query parameter.
     if (vesselType !== undefined) query.type = vesselType;
 
-    const { data, meta } = await this.client._getFull<VesselInfo[]>('/vessel_find', undefined, query);
-    return {
-      vessels: data,
-      next: typeof meta.next === 'string' ? meta.next : undefined,
-    };
+    const { data: vessels, meta } = await this.client._getWithMeta<VesselInfo[]>(
+      '/vessel_find',
+      undefined,
+      query,
+    );
+    return attachMeta(
+      {
+        vessels,
+        next: typeof meta.next === 'string' ? meta.next : undefined,
+      },
+      meta,
+    );
   }
 
   /** Pro position with an estimated dead-reckoned position (extended API). */
-  async estimated(params: VesselIdentifier): Promise<VesselEstimated> {
+  async estimated(params: VesselIdentifier): Promise<WithMeta<VesselEstimated>> {
     requireIdentifier(params);
     return this.client._get<VesselEstimated>('/vessel_pro_est', BASE_EXT, {
       ...params,

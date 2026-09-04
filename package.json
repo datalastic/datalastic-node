@@ -14,6 +14,7 @@
   },
   "files": [
     "dist",
+    "CHANGELOG.md",
     "README.md",
     "LICENSE"
   ],
@@ -22,7 +23,8 @@
     "build:esm": "tsc --project tsconfig.esm.json",
     "build:cjs": "tsc --project tsconfig.cjs.json && node -e \"require('fs').writeFileSync('dist/cjs/package.json',JSON.stringify({type:'commonjs'}))\"",
     "build:types": "tsc --project tsconfig.json --emitDeclarationOnly --declaration --declarationDir dist/types",
-    "test": "node --experimental-vm-modules node_modules/.bin/jest"
+    "test": "node --experimental-vm-modules node_modules/.bin/jest",
+    "version": "node scripts/sync-version.mjs && git add src/version.ts"
   },
   "engines": {
     "node": ">=18"
@@ -60,7 +62,8 @@
       "^.+\\.tsx?$": [
         "ts-jest",
         {
-          "useESM": true
+          "useESM": true,
+          "tsconfig": "tsconfig.test.json"
         }
       ]
     },

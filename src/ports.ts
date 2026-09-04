@@ -2,7 +2,7 @@
 
 import type { Datalastic, QueryParams } from './client.js';
 import { DatalasticError } from './errors.js';
-import type { Port, PortDetail } from './models.js';
+import type { Port, PortDetail, WithMeta } from './models.js';
 
 export interface PortFindParams {
   name?: string;
@@ -29,7 +29,7 @@ export class PortsResource {
   constructor(private readonly client: Datalastic) {}
 
   /** Search ports by name, location, or attributes. */
-  async find(params: PortFindParams): Promise<Port[]> {
+  async find(params: PortFindParams): Promise<WithMeta<Port[]>> {
     const hasParam = Object.values(params).some((v) => v !== undefined);
     if (!hasParam) {
       throw new DatalasticError('At least one search parameter is required for port find.');
@@ -40,7 +40,7 @@ export class PortsResource {
   }
 
   /** Detailed record for a single port, including terminals. */
-  async get(params: PortGetParams): Promise<PortDetail> {
+  async get(params: PortGetParams): Promise<WithMeta<PortDetail>> {
     const hasIdentifier =
       params.name !== undefined ||
       params.uuid !== undefined ||

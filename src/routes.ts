@@ -2,7 +2,7 @@
 
 import { BASE_EXT, type Datalastic, type QueryParams } from './client.js';
 import { DatalasticError } from './errors.js';
-import type { SeaRoute } from './models.js';
+import type { SeaRoute, WithMeta } from './models.js';
 
 export interface RouteCalculateParams {
   lat_from?: number;
@@ -19,7 +19,7 @@ export class RoutesResource {
   constructor(private readonly client: Datalastic) {}
 
   /** Compute a sea route between two points or ports. */
-  async calculate(params: RouteCalculateParams): Promise<SeaRoute> {
+  async calculate(params: RouteCalculateParams): Promise<WithMeta<SeaRoute>> {
     const hasFrom =
       (params.lat_from !== undefined && params.lon_from !== undefined) ||
       params.port_uuid_from !== undefined ||

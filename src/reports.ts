@@ -2,7 +2,7 @@
 
 import { BASE_MR, type Datalastic } from './client.js';
 import { DatalasticError } from './errors.js';
-import type { Report } from './models.js';
+import type { Report, WithMeta } from './models.js';
 
 export class ReportsResource {
   constructor(private readonly client: Datalastic) {}
@@ -11,7 +11,7 @@ export class ReportsResource {
   async submit(
     reportType: string,
     params: Record<string, unknown> = {},
-  ): Promise<Report> {
+  ): Promise<WithMeta<Report>> {
     if (!reportType || reportType.trim() === '') {
       throw new DatalasticError('reportType is required.');
     }
@@ -23,7 +23,7 @@ export class ReportsResource {
   }
 
   /** Retrieve the status / result of a single report. */
-  async get(reportId: string): Promise<Report> {
+  async get(reportId: string): Promise<WithMeta<Report>> {
     if (!reportId || reportId.trim() === '') {
       throw new DatalasticError('reportId is required.');
     }
@@ -33,7 +33,7 @@ export class ReportsResource {
   }
 
   /** List every report submitted under the configured key. */
-  async listAll(): Promise<Report[]> {
+  async listAll(): Promise<WithMeta<Report[]>> {
     return this.client._get<Report[]>('/report', BASE_MR, {
       report_id: '_all',
     });

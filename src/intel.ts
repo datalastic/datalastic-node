@@ -11,6 +11,7 @@ import type {
   InspectionRecord,
   OwnershipRecord,
   SPDRecord,
+  WithMeta,
 } from './models.js';
 
 export interface DryDockParams {
@@ -87,7 +88,7 @@ export class IntelResource {
   constructor(private readonly client: Datalastic) {}
 
   /** Dry dock and special survey schedule records. */
-  async dryDock(params: DryDockParams): Promise<DryDockRecord[]> {
+  async dryDock(params: DryDockParams): Promise<WithMeta<DryDockRecord[]>> {
     requireAtLeastOne(params, 'dryDock');
     return this.client._get<DryDockRecord[]>('/dry_dock_dates', BASE_MR, {
       ...params,
@@ -95,7 +96,7 @@ export class IntelResource {
   }
 
   /** Vessel casualty records. */
-  async casualties(params: CasualtyParams): Promise<CasualtyRecord[]> {
+  async casualties(params: CasualtyParams): Promise<WithMeta<CasualtyRecord[]>> {
     requireAtLeastOne(params, 'casualties');
     return this.client._get<CasualtyRecord[]>('/casualty', BASE_MR, {
       ...params,
@@ -103,7 +104,7 @@ export class IntelResource {
   }
 
   /** Port state control inspection records. */
-  async inspections(params: InspectionParams): Promise<InspectionRecord[]> {
+  async inspections(params: InspectionParams): Promise<WithMeta<InspectionRecord[]>> {
     requireAtLeastOne(params, 'inspections');
     return this.client._get<InspectionRecord[]>('/inspections', BASE_MR, {
       ...params,
@@ -111,7 +112,7 @@ export class IntelResource {
   }
 
   /** Sale and purchase (S&P) deal records. */
-  async spd(params: SPDParams): Promise<SPDRecord[]> {
+  async spd(params: SPDParams): Promise<WithMeta<SPDRecord[]>> {
     requireAtLeastOne(params, 'spd');
     return this.client._get<SPDRecord[]>('/spd', BASE_MR, {
       ...params,
@@ -119,7 +120,7 @@ export class IntelResource {
   }
 
   /** Beneficial ownership and management records. */
-  async ownership(params: OwnershipParams): Promise<OwnershipRecord[]> {
+  async ownership(params: OwnershipParams): Promise<WithMeta<OwnershipRecord[]>> {
     requireAtLeastOne(params, 'ownership');
     return this.client._get<OwnershipRecord[]>('/ownership', BASE_MR, {
       ...params,
@@ -129,7 +130,7 @@ export class IntelResource {
   /** Classification society records. */
   async classSociety(
     params: ClassSocietyParams,
-  ): Promise<ClassSocietyRecord[]> {
+  ): Promise<WithMeta<ClassSocietyRecord[]>> {
     requireAtLeastOne(params, 'classSociety');
     return this.client._get<ClassSocietyRecord[]>('/class_society', BASE_MR, {
       ...params,
@@ -137,7 +138,7 @@ export class IntelResource {
   }
 
   /** Engine and propulsion records. */
-  async engine(params: EngineParams): Promise<EngineRecord[]> {
+  async engine(params: EngineParams): Promise<WithMeta<EngineRecord[]>> {
     requireAtLeastOne(params, 'engine');
     return this.client._get<EngineRecord[]>('/engine', BASE_MR, {
       ...params,
@@ -145,7 +146,7 @@ export class IntelResource {
   }
 
   /** Company registry records. */
-  async companies(params: CompanyParams): Promise<CompanyRecord[]> {
+  async companies(params: CompanyParams): Promise<WithMeta<CompanyRecord[]>> {
     requireAtLeastOne(params, 'companies');
     return this.client._get<CompanyRecord[]>('/companies', BASE_MR, {
       ...params,

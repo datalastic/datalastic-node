@@ -2,8 +2,36 @@
  * TypeScript interfaces describing the Datalastic Maritime API response shapes.
  *
  * These types model the `data` payload of each endpoint after the SDK has
- * unwrapped the `{ data, meta }` envelope.
+ * unwrapped the `{ data, meta }` envelope. The envelope's `meta` object is
+ * still reachable: every resource method returns {@link WithMeta}, which
+ * attaches `meta` as a non-enumerable property of the returned payload.
  */
+
+/**
+ * The `meta` object of an API response envelope.
+ *
+ * `success: false` on an HTTP 200 signals a failed request; the SDK turns that
+ * into an `APIError` before returning. `next` is the pagination cursor for
+ * paged endpoints. Credit and usage counters vary by endpoint and are reached
+ * through the index signature.
+ */
+export interface ResponseMeta {
+  success?: boolean;
+  message?: string;
+  next?: string;
+  [key: string]: unknown;
+}
+
+/**
+ * A response payload with its envelope `meta` attached.
+ *
+ * `meta` is defined as a non-enumerable, non-writable own property, so arrays
+ * stay ordinary arrays and objects stay ordinary objects: `Array.isArray`,
+ * `.length`, spreading, `Object.keys`, and `JSON.stringify` all behave as if
+ * `meta` were not there. When the payload is `null` or a primitive, nothing
+ * can be attached and `meta` is unavailable.
+ */
+export type WithMeta<T> = T & { readonly meta: ResponseMeta };
 
 export interface Vessel {
   uuid: string;
@@ -50,10 +78,13 @@ export interface VesselInRadiusResult {
   point: { lat: number; lon: number; radius: number };
   total: number;
   vessels: Array<Vessel & { distance: number }>;
+  /** Pagination cursor from the envelope `meta`; pass it back as `next`. */
+  next?: string;
 }
 
 export interface VesselFindResult {
   vessels: VesselInfo[];
+  /** Pagination cursor from the envelope `meta`; pass it back as `next`. */
   next?: string;
 }
 

@@ -5,4 +5,5 @@ coverage/
 .DS_Store
 .env
 *.tsbuildinfo
+*.tgz
 CLAUDE.md

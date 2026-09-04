@@ -10,12 +10,14 @@ The Datalastic Node.js SDK is a typed client for the Datalastic Maritime API. It
 - [Installation](#installation)
 - [Authentication](#authentication)
 - [Quick Start](#quick-start)
+- [Response Metadata](#response-metadata)
 - [Vessels](#vessels)
 - [Ports](#ports)
 - [Sea Routes](#sea-routes)
 - [Intelligence Records](#intelligence-records)
 - [Async Reports](#async-reports)
 - [Error Handling](#error-handling)
+- [Retries and Timeouts](#retries-and-timeouts)
 - [TypeScript](#typescript)
 - [Development](#development)
 - [License](#license)
@@ -69,6 +71,46 @@ You can raise the default 30-second timeout if your environment needs more headr
 ```ts
 const client = new Datalastic(process.env.DATALASTIC_API_KEY!, { timeout: 60_000 });
 ```
+
+Every constructor option is validated up front — see [Retries and Timeouts](#retries-and-timeouts).
+
+---
+
+## Response Metadata
+
+The API wraps every response in a `{ data, meta }` envelope. Methods return the `data` payload with the envelope's `meta` attached as a **non-enumerable** property, so results still behave like plain arrays and objects:
+
+```ts
+const ports = await client.ports.find({ name: 'Rotterdam' });
+
+Array.isArray(ports);   // true
+ports.length;           // 2
+Object.keys(ports[0]);  // no 'meta' key
+JSON.stringify(ports);  // serializes exactly as the API returned it
+
+ports.meta;             // credits, usage counters, pagination cursor
+```
+
+`meta` is typed as `ResponseMeta`: `success?`, `message?`, `next?`, plus an index signature for the per-endpoint counters. It defaults to `{}` when the API omits it.
+
+```ts
+const stat = await client.stat();
+console.log(stat.meta);
+```
+
+### When `meta` is not attached
+
+The SDK never mutates a payload destructively and never crashes the caller to deliver metadata. In three cases the payload is returned exactly as received and `meta` is unavailable on it:
+
+- **`null` or a primitive payload** — nothing can hold a property.
+- **A frozen, sealed, or otherwise non-extensible payload.** `vessels.inRadius` likewise skips writing its `next` cursor onto such a payload rather than throwing.
+- **A payload that already owns a `meta` field.** The payload's own value wins and is left untouched; the envelope's `meta` is not attached over it.
+
+Pagination is unaffected in every one of these cases: `vessels.find` and `vessels.inRadius` take the cursor from the envelope returned by the request itself, not from the attached property, so `page.next` is still correct.
+
+If the same object is handed back for a second response (for example a shared fixture in your own tests), the attached `meta` is refreshed to the newer envelope. The SDK tells its own attachment apart from an API field by its property descriptor: API fields parsed from JSON are always enumerable, the SDK's `meta` never is. One consequence of that rule: a non-enumerable, configurable `meta` property placed on the payload by something other than this SDK, an accessor in a hand-written test double for instance, matches the same signature and is replaced. Nothing `JSON.parse` produces can look like that.
+
+If the API answers HTTP 200 with `meta.success === false`, the SDK raises an `APIError` carrying `meta.message` instead of returning a half-empty payload.
 
 ---
 
@@ -157,17 +199,54 @@ console.log(info.gross_tonnage, info.length, info.year_built);
 
 ### Search the vessel database
 
-Returns an array of `VesselInfo` records — the same static particulars as `vessels.info` (tonnage, deadweight, dimensions, year built, home port, call sign, etc.), one per matching vessel:
+Returns a `VesselFindResult` — `{ vessels, next }` — where `vessels` is an array of `VesselInfo` records (the same static particulars as `vessels.info`: tonnage, deadweight, dimensions, year built, home port, call sign, etc.) and `next` is the pagination cursor, `undefined` on the last page:
 
 ```ts
-const results = await client.vessels.find({
+const page = await client.vessels.find({
   name: 'EVER',
   vesselType: 'Cargo',
   gross_tonnage_min: 50_000,
 });
+
+console.log(page.vessels.length, page.next);
 ```
 
 `vesselType` maps to the `type` query parameter internally. The field name avoids colliding with the JavaScript `type` keyword.
+
+#### Pagination
+
+Feed `next` back in to walk every page:
+
+```ts
+const all: VesselInfo[] = [];
+let cursor: string | undefined;
+
+do {
+  const page = await client.vessels.find({ vesselType: 'Cargo', next: cursor });
+  all.push(...page.vessels);
+  cursor = page.next;
+} while (cursor);
+```
+
+`vessels.inRadius` paginates the same way — its result also carries a `next` cursor taken from the envelope `meta`:
+
+```ts
+const seen = [];
+let cursor: string | undefined;
+
+do {
+  const page = await client.vessels.inRadius({
+    lat: 1.29,
+    lon: 103.85,
+    radius: 25,
+    next: cursor,
+  });
+  seen.push(...page.vessels);
+  cursor = page.next;
+} while (cursor);
+```
+
+Both cursors come from `meta.next`, which is also readable directly as `page.meta.next`.
 
 ---
 
@@ -378,8 +457,51 @@ try {
 | 404 | `NotFoundError` |
 | 429 | `RateLimitError` (`.retryAfter?: number` from the `Retry-After` header) |
 | 400, 500, timeout, malformed body | `APIError` |
+| 200 with `meta.success === false` | `APIError` (`.statusCode` is the HTTP status, message is `meta.message`) |
 
-Validation errors (missing required fields) throw `DatalasticError` before any network call is made.
+Validation errors (missing required fields) and invalid constructor options throw `DatalasticError` before any network call is made.
+
+---
+
+## Retries and Timeouts
+
+Requests are retried automatically. The defaults are conservative: rate limits are retried on both verbs, transport failures on GET only.
+
+| Option | Default | Meaning |
+|---|---|---|
+| `timeout` | `30000` | Per-attempt timeout in ms. Finite, `> 0`, `<= 2147483647`. |
+| `maxRetries` | `3` | Retries after the first attempt. `0` disables retrying. Integer in `[0, 100]`. |
+| `backoffMs` | `500` | Base for exponential backoff: retry `n` (0-based) waits `backoffMs * 2 ** n`. |
+| `maxRetryDelayMs` | `60000` | Ceiling applied to every wait, including one derived from `Retry-After`. |
+| `retryableStatuses` | `[429]` | Statuses that trigger a retry. Each must be 408, 429, or in `[500, 599]`. |
+| `sleep` | `setTimeout` | Delay function between attempts. Exposed as a test hook. |
+
+```ts
+const client = new Datalastic(process.env.DATALASTIC_API_KEY!, {
+  maxRetries: 5,
+  backoffMs: 250,
+  maxRetryDelayMs: 10_000,
+  retryableStatuses: [429, 500, 502, 503, 504],
+});
+
+// Opt out entirely:
+const noRetry = new Datalastic(process.env.DATALASTIC_API_KEY!, { maxRetries: 0 });
+```
+
+### What is retried
+
+- **Network failures and timeouts: GET only.** A POST that fails in transit may still have been processed, and `reports.submit` creates a job, so POST is never retried on a connection error or timeout.
+- **Retryable statuses: both verbs.** Opting 5xx in therefore applies to POST too, which can duplicate a submitted report if the server processed the request before the response failed. Opt in deliberately.
+- **Nothing else.** 400, 401, 402, 404, and any 5xx you have not opted in throw immediately, without waiting.
+- The set is used verbatim: passing `retryableStatuses` without `429` means 429 is not retried.
+
+### How long it waits
+
+For a retryable status the SDK honors the `Retry-After` response header in both of its forms — delta-seconds (`Retry-After: 2`) and HTTP-date (`Retry-After: Wed, 21 Oct 2015 07:28:00 GMT`). An absent or unparseable header falls back to exponential backoff. Every wait, from either source, is capped at `maxRetryDelayMs`, so a broken or hostile header cannot stall your process. `RateLimitError.retryAfter` reports the same value in whole seconds.
+
+### Configuration validation
+
+Bad options fail at construction with a `DatalasticError` naming the option, the value received, and the accepted range — no silent coercion. Rejected: a `timeout` that is zero, negative, `NaN`, `Infinity`, not a number, or above `2147483647`; a `maxRetries` that is not an integer in `[0, 100]`; a negative or non-finite `backoffMs`; a `maxRetryDelayMs` that is not above zero; a `retryableStatuses` entry that is not an integer 408, 429, or 500-599 (401, 402, and 404 are rejected outright); and a `sleep` that is not a function.
 
 ---
 
@@ -396,6 +518,7 @@ import type {
   VesselHistory,
   VesselBulkResult,
   VesselInRadiusResult,
+  VesselFindResult,
   Port,
   PortDetail,
   SeaRoute,
@@ -409,7 +532,15 @@ import type {
   ClassSocietyRecord,
   EngineRecord,
   CompanyRecord,
+  ResponseMeta,
+  WithMeta,
 } from 'datalastic';
+```
+
+Every method returns `WithMeta<T>` — its payload type plus the non-enumerable `meta` property described in [Response Metadata](#response-metadata). The runtime SDK version is exported as `SDK_VERSION` and is sent on every request as `User-Agent: datalastic-node/<version>`.
+
+```ts
+import { SDK_VERSION } from 'datalastic';
 ```
 
 The package ships `.d.ts` declaration files for both the ESM and CJS entry points, so TypeScript resolves types without any extra `tsconfig` configuration.

@@ -16,9 +16,12 @@ export {
   BASE_V0,
   BASE_EXT,
   BASE_MR,
+  USER_AGENT,
   type DatalasticOptions,
   type QueryParams,
 } from './client.js';
+
+export { SDK_VERSION } from './version.js';
 
 export {
   DatalasticError,
